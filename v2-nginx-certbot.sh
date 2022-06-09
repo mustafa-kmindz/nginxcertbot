@@ -75,28 +75,30 @@ for DOMAIN in $DOMAINS; do
     [[ ${PROXY_PASS_PATH:0:1} == "/" ]] && PROXY_PASS_PATH=${PROXY_PASS_PATH:1}
       
     sudo cat > /etc/nginx/sites-available/${DOMAIN} << EOF
-server{
-  listen 80;
-  listen [::]:80;
-  server_name ${DOMAIN};
-  return 301 https://\$host\$request_uri;
+
+server {
+   server_name ${DOMAIN};
+
+   location / {
+    proxy_pass http://localhost:${PROXY_PASS_PORT};
+   }
+
+
+  listen 443 ssl;
+  ssl_certificate /etc/letsencrypt/live/${LE_DIR}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${LE_DIR}/privkey.pem;
+  include /etc/letsencrypt/options-ssl-nginx.conf;
+  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 }
 
 server {
-  listen [::]:443 ssl;
-  listen 443 ssl;
-  server_name ${DOMAIN};
+    if (\$host = ${DOMAIN}) {
+        return 301 https://\$host\$request_uri;
+    } 
 
-  ssl_certificate /etc/letsencrypt/live/${LE_DIR}/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/${LE_DIR}/privkey.pem;
-
-  include /etc/letsencrypt/options-ssl-nginx.conf;
-  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-
-  location / {
-    proxy_pass http://localhost:${PROXY_PASS_PORT}/${PROXY_PASS_PATH}\$request_uri;
-    proxy_set_header Host ${DOMAIN};
-  }
+   server_name ${DOMAIN};
+    listen 80;
+    return 404;
 }
 EOF
   sudo ln -s /etc/nginx/sites-available/${DOMAIN} /etc/nginx/sites-enabled/${DOMAIN}
